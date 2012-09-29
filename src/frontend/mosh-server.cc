@@ -96,7 +96,10 @@ void serve( int host_fd,
 
 int run_server( const char *desired_ip, const char *desired_port,
 		const string &command_path, char *command_argv[],
-		const int colors, bool verbose, bool with_motd );
+		const int colors, bool verbose, bool with_motd,
+		const vector< uint8_t > & salt );
+
+const vector< uint8_t > get_client_entropy( void );
 
 using namespace std;
 
@@ -166,6 +169,7 @@ int main( int argc, char *argv[] )
   int colors = 0;
   bool verbose = false; /* don't close stdin/stdout/stderr */
   /* Will cause mosh-server not to correctly detach on old versions of sshd. */
+  bool client_entropy = false; /* receive entropy from client to help key generation */
   list<string> locale_vars;
 
   /* strip off command */
@@ -184,7 +188,7 @@ int main( int argc, char *argv[] )
        && (strcmp( argv[ 1 ], "new" ) == 0) ) {
     /* new option syntax */
     int opt;
-    while ( (opt = getopt( argc - 1, argv + 1, "i:p:c:svl:" )) != -1 ) {
+    while ( (opt = getopt( argc - 1, argv + 1, "i:p:c:svel:" )) != -1 ) {
       switch ( opt ) {
       case 'i':
 	desired_ip = optarg;
@@ -201,6 +205,9 @@ int main( int argc, char *argv[] )
 	break;
       case 'v':
 	verbose = true;
+	break;
+      case 'e':
+	client_entropy = true;
 	break;
       case 'l':
 	locale_vars.push_back( string( optarg ) );
@@ -313,8 +320,14 @@ int main( int argc, char *argv[] )
     }
   }
 
+  vector< uint8_t > additional_entropy;
+  if ( client_entropy ) {
+    additional_entropy = get_client_entropy();
+  }
+
   try {
-    return run_server( desired_ip, desired_port, command_path, command_argv, colors, verbose, with_motd );
+    return run_server( desired_ip, desired_port, command_path,
+		       command_argv, colors, verbose, with_motd, additional_entropy );
   } catch ( const Network::NetworkException& e ) {
     fprintf( stderr, "Network exception: %s: %s\n",
 	     e.function.c_str(), strerror( e.the_errno ) );
@@ -328,7 +341,8 @@ int main( int argc, char *argv[] )
 
 int run_server( const char *desired_ip, const char *desired_port,
 		const string &command_path, char *command_argv[],
-		const int colors, bool verbose, bool with_motd ) {
+		const int colors, bool verbose, bool with_motd,
+		const vector< uint8_t > & salt ) {
   /* get initial window size */
   struct winsize window_size;
   if ( ioctl( STDIN_FILENO, TIOCGWINSZ, &window_size ) < 0 ) {
@@ -343,6 +357,10 @@ int run_server( const char *desired_ip, const char *desired_port,
   /* open network */
   Network::UserStream blank;
   ServerConnection *network = new ServerConnection( terminal, blank, desired_ip, desired_port );
+
+  printf( "\nMOSH OLDKEY %d %s\n", network->port(), network->get_key().c_str() );
+
+  network->salt_key( salt );
 
   if ( verbose ) {
     network->set_verbose();
@@ -780,6 +798,55 @@ string mosh_read_line( FILE *file )
     }
     ret.push_back( next );
   }
+  return ret;
+}
+
+const vector< uint8_t > get_client_entropy( void )
+{
+  struct termios saved_termios, noecho_termios;
+
+  /* save termios settings */
+  if ( tcgetattr( STDIN_FILENO, &saved_termios ) < 0 ) {
+    perror( "tcgetattr" );
+    exit( 1 );
+  }
+
+  noecho_termios = saved_termios;
+
+  /* turn off echo */
+  noecho_termios.c_lflag &= ~ECHO;
+
+  if ( tcsetattr( STDIN_FILENO, TCSANOW, &noecho_termios ) < 0 ) {
+    perror( "tcsetattr" );
+    exit( 1 );
+  }
+
+  /* prompt client */
+  printf( "MOSH CLIENT ENTROPY\r\n" );
+
+  vector< uint8_t > ret;
+
+  /* read answer */
+  while ( 1 ) {
+    unsigned int octet;
+    int items_read = scanf( "%u\n", &octet );
+    if ( items_read != 1 ) {
+      break;
+    }
+
+    ret.push_back( octet );
+  }
+
+  /* restore echoing */
+  if ( tcsetattr( STDIN_FILENO, TCSANOW, &saved_termios ) < 0 ) {
+    perror( "tcsetattr" );
+    exit( 1 );
+  }
+
+  if ( ret.size() != 16 ) {
+    fprintf( stderr, "Warning: Got %d bytes of client entropy (expected 16).\n", (int)ret.size() );
+  }
+
   return ret;
 }
 

@@ -38,6 +38,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <vector>
 
 using std::string;
 
@@ -84,6 +85,8 @@ namespace Crypto {
     Base64Key( string printable_key );
     string printable_key( void ) const;
     unsigned char *data( void ) { return key; }
+
+    void salt_key( const std::vector< uint8_t > & salt );
   };
 
   class Nonce {
@@ -122,6 +125,8 @@ namespace Crypto {
     AlignedBuffer plaintext_buffer;
     AlignedBuffer ciphertext_buffer;
     AlignedBuffer nonce_buffer;
+
+    bool salted;
     
   public:
     static const int RECEIVE_MTU = 2048;
@@ -134,6 +139,9 @@ namespace Crypto {
     
     Session( const Session & );
     Session & operator=( const Session & );
+
+    const Base64Key & secret_key( void ) const { return key; }
+    void salt_key( const std::vector< uint8_t > & salt );
   };
 
   void disable_dumping_core( void );

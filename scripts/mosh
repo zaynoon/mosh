@@ -208,15 +208,32 @@ if ( (not defined $colors)
   $colors = 0;
 }
 
+# produce client salt to help servers with low entropy
+my $salt = "";
+open RANDOM, "/dev/urandom" or die "$0: Can't open /dev/urandom: $!\n";
+for ( 1 .. 16 ) {
+  my $octet;
+  if ( 1 != read RANDOM, $octet, 1 ) {
+    die "$0: Short read from /dev/urandom: $!\n";
+  }
+  my $octet_decimal = unpack "W", $octet;
+  $salt .= $octet_decimal . "\n";
+}
+$salt .= "END\n";
+
+close RANDOM or die "$0: Can't close /dev/urandom: $!\n";
+
 my $pid = fork;
 die "$0: fork: $!\n" unless ( defined $pid );
 if ( $pid == 0 ) { # child
-  $pty->close_slave();
+#  $pty->close_slave();
+  $pty->make_slave_controlling_terminal();
   $pty->set_raw();
+  open STDIN, "<&", $pty or die;
   open STDOUT, ">&", $pty or die;
   open STDERR, ">&", $pty or die;
 
-  my @server = ( 'new', '-s' );
+  my @server = ( 'new', '-s', '-e' );
 
   push @server, ( '-c', $colors );
 
@@ -247,10 +264,15 @@ if ( $pid == 0 ) { # child
       ( $ip ) = m{^MOSH IP (\S+)\s*$} or die "Bad MOSH IP string: $_\n";
     } elsif ( m{^MOSH CONNECT } ) {
       if ( ( $port, $key ) = m{^MOSH CONNECT (\d+?) ([A-Za-z0-9/+]{22})\s*$} ) {
-	last LINE;
+#	last LINE;
       } else {
 	die "Bad MOSH CONNECT string: $_\n";
       }
+    } elsif ( m{^MOSH CLIENT ENTROPY} ) {
+      print STDERR "Printing salt... ";
+      print $pty_slave $salt;
+      $pty_slave->flush;
+      print STDERR "done.\r\n";
     } else {
       print "$_\n";
     }

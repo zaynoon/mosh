@@ -135,6 +135,17 @@ Base64Key::Base64Key()
   }
 }
 
+void Base64Key::salt_key( const vector< uint8_t > & salt )
+{
+  for ( unsigned int i = 0; i < salt.size(); i++ ) {
+    if ( i > 16 ) {
+      return;
+    }
+
+    key[ i ] = key[ i ] ^ salt[ i ];
+  }
+}
+
 string Base64Key::printable_key( void ) const
 {
   char base64[ 24 ];
@@ -155,7 +166,8 @@ Session::Session( Base64Key s_key )
     ctx( (ae_ctx *)ctx_buf.data() ), blocks_encrypted( 0 ),
     plaintext_buffer( RECEIVE_MTU ),
     ciphertext_buffer( RECEIVE_MTU ),
-    nonce_buffer( Nonce::NONCE_LEN )
+    nonce_buffer( Nonce::NONCE_LEN ),
+    salted( false )
 {
   if ( AE_SUCCESS != ae_init( ctx, key.data(), 16, 12, 16 ) ) {
     throw CryptoException( "Could not initialize AES-OCB context." );
@@ -167,6 +179,17 @@ Session::~Session()
   if ( ae_clear( ctx ) != AE_SUCCESS ) {
     throw CryptoException( "Could not clear AES-OCB context." );
   }
+}
+
+void Session::salt_key( const vector< uint8_t > & salt )
+{
+  if ( salted ) {
+    throw CryptoException( "Attempted to salt session twice.", true );
+  }
+
+  salted = true;
+
+  key.salt_key( salt );
 }
 
 Nonce::Nonce( uint64_t val )

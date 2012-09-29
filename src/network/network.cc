@@ -153,14 +153,13 @@ void Connection::setup( void )
 #endif
 }
 
-Connection::Connection( const char *desired_ip, const char *desired_port ) /* server */
+Connection::Connection( const char *desired_ip, const char *desired_port )
   : sock( -1 ),
     has_remote_addr( false ),
     remote_addr(),
     server( true ),
     MTU( SEND_MTU ),
-    key(),
-    session( key ),
+    session( Base64Key() ),
     direction( TO_CLIENT ),
     next_seq( 0 ),
     saved_timestamp( -1 ),
@@ -271,8 +270,7 @@ Connection::Connection( const char *key_str, const char *ip, int port ) /* clien
     remote_addr(),
     server( false ),
     MTU( SEND_MTU ),
-    key( key_str ),
-    session( key ),
+    session( Base64Key( key_str ) ),
     direction( TO_SERVER ),
     next_seq( 0 ),
     saved_timestamp( -1 ),

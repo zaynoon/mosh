@@ -118,6 +118,8 @@ namespace Network {
     const struct in_addr & get_remote_ip( void ) const { return connection.get_remote_ip(); }
 
     const NetworkException *get_send_exception( void ) const { return connection.get_send_exception(); }
+
+    void salt_key( const vector< uint8_t > & salt ) { connection.salt_key( salt ); }
   };
 }
 

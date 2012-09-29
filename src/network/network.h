@@ -39,6 +39,7 @@
 #include <netinet/in.h>
 #include <string>
 #include <math.h>
+#include <vector>
 
 #include "crypto.h"
 
@@ -106,7 +107,6 @@ namespace Network {
 
     int MTU;
 
-    Base64Key key;
     Session session;
 
     void setup( void );
@@ -145,7 +145,7 @@ namespace Network {
     int get_MTU( void ) const { return MTU; }
 
     int port( void ) const;
-    string get_key( void ) const { return key.printable_key(); }
+    string get_key( void ) const { return session.secret_key().printable_key(); }
     bool get_has_remote_addr( void ) const { return has_remote_addr; }
 
     uint64_t timeout( void ) const;
@@ -159,6 +159,8 @@ namespace Network {
     }
 
     void set_last_roundtrip_success( uint64_t s_success ) { last_roundtrip_success = s_success; }
+
+    void salt_key( const std::vector< uint8_t > & salt ) { session.salt_key( salt ); }
   };
 }
 
