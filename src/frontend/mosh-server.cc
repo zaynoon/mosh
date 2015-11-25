@@ -661,21 +661,6 @@ static void serve( int host_fd, Terminal::Complete &terminal, ServerConnection &
 	}
       }
       
-      /*
-       * Read from the terminal first.  On BSD pty implementations, writing \013 to the pty
-       * can make formerly-available data unavailable.  Mosh used to operate
-       * in this order:
-       *
-       * sel.select()
-       * network.read(), possibly with pty write()
-       * pty read()
-       *
-       * If select returned read status for both the network socket
-       * and the pty, and the incoming packet delivered a ^S, mosh
-       * would deadlock in read() with the pty driver, waiting for
-       * output, which of course won't appear until the pty is
-       * unblocked with a ^Q or equivalent ioctl.
-       */
       if ( (!network.shutdown_in_progress()) && ( sel.read( host_fd ) || sel.error( host_fd ) ) ) {
 	/* input from the host needs to be fed to the terminal */
 	const int buf_size = 16385;
