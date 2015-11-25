@@ -599,7 +599,7 @@ static void serve( int host_fd, Terminal::Complete &terminal, ServerConnection &
        * output, which of course won't appear until the pty is
        * unblocked with a ^Q or equivalent ioctl.
        */
-      if ( (!network.shutdown_in_progress()) && sel.read( host_fd ) ) {
+      if ( (!network.shutdown_in_progress()) && ( sel.read( host_fd ) || sel.error( host_fd ) ) ) {
 	/* input from the host needs to be fed to the terminal */
 	const int buf_size = 16385;
 	char buf[ buf_size ];
@@ -614,7 +614,7 @@ static void serve( int host_fd, Terminal::Complete &terminal, ServerConnection &
 	   better behavior with select() and blocking reads.  We
 	   don't actually care about any of the control information
 	   in the packet header, so we just discard it. */
-        if ( bytes_read < 0 ) {
+        if ( bytes_read <= 0 ) {
 	  network.start_shutdown();
 	} else if ( bytes_read > 1 ) {
 	  string terminal_to_host = terminal.act( string( buf + 1, bytes_read - 1 ) );
@@ -718,11 +718,6 @@ static void serve( int host_fd, Terminal::Complete &terminal, ServerConnection &
       if ( sel.error( network_fd ) ) {
 	/* network problem */
 	break;
-      }
-
-      if ( (!network.shutdown_in_progress()) && sel.error( host_fd ) ) {
-	/* host problem */
-	network.start_shutdown();
       }
 
       /* quit if our shutdown has been acknowledged */
