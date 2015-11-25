@@ -685,15 +685,12 @@ static void serve( int host_fd, Terminal::Complete &terminal, ServerConnection &
 	ssize_t bytes_read = read( host_fd, buf, buf_size );
 
         /* If the pty slave is closed, reading from the master can fail with
-           EIO (see #264).  So we treat errors on read() like EOF.
-
-	   We now run the pty in packet mode (see #692), to get its
-	   better behavior with select() and blocking reads.  We
-	   don't actually care about any of the control information
-	   in the packet header, so we just discard it. */
+           EIO (see #264).  So we treat errors on read() like EOF, and shut
+	   down mosh-server normally.  */
         if ( bytes_read <= 0 ) {
 	  network.start_shutdown();
 	} else if ( bytes_read > 1 ) {
+	  /* Discard pty packet header. */
 	  string terminal_to_host = terminal.act( string( buf + 1, bytes_read - 1 ) );
 	
 	  /* update client with new state of terminal */
