@@ -504,6 +504,13 @@ static int run_server( const char *desired_ip, const char *desired_port,
     utempter_add_record( master, utmp_entry );
 #endif
 
+    const int one = 1;
+    if ( ioctl( master, TIOCPKT, &one ) != 0 ) {
+      perror( "pty packet mode" );
+      exit( 1 );
+    }
+
+
     try {
       serve( master, terminal, *network );
     } catch ( const Network::NetworkException &e ) {
@@ -594,18 +601,23 @@ static void serve( int host_fd, Terminal::Complete &terminal, ServerConnection &
        */
       if ( (!network.shutdown_in_progress()) && sel.read( host_fd ) ) {
 	/* input from the host needs to be fed to the terminal */
-	const int buf_size = 16384;
+	const int buf_size = 16385;
 	char buf[ buf_size ];
 	
 	/* fill buffer if possible */
 	ssize_t bytes_read = read( host_fd, buf, buf_size );
 
         /* If the pty slave is closed, reading from the master can fail with
-           EIO (see #264).  So we treat errors on read() like EOF. */
-        if ( bytes_read <= 0 ) {
+           EIO (see #264).  So we treat errors on read() like EOF.
+
+	   We now run the pty in packet mode (see #692), to get its
+	   better behavior with select() and blocking reads.  We
+	   don't actually care about any of the control information
+	   in the packet header, so we just discard it. */
+        if ( bytes_read < 0 ) {
 	  network.start_shutdown();
-	} else {
-	  string terminal_to_host = terminal.act( string( buf, bytes_read ) );
+	} else if ( bytes_read > 1 ) {
+	  string terminal_to_host = terminal.act( string( buf + 1, bytes_read - 1 ) );
 	
 	  /* update client with new state of terminal */
 	  network.set_current_state( terminal );
