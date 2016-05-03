@@ -174,7 +174,7 @@ Connection::Socket::Socket( int family )
   int tosflag = true;
   socklen_t tosoptlen = sizeof( tosflag );
   if ( setsockopt( _fd, IPPROTO_IP, IP_RECVTOS, &tosflag, tosoptlen ) < 0 ) {
-    perror( "setsockopt( IP_RECVTOS )" );
+    // perror( "setsockopt( IP_RECVTOS )" );
   }
 #endif
 }
