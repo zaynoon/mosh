@@ -1,0 +1,2 @@
+#!/bin/sh
+LD_PRELOAD=/home/cgull/src/wsl-openpty/forkpty.so /usr/bin/strace -Dffo ms /home/cgull/src/mosh-keithw/src/frontend/mosh-server "$@"
