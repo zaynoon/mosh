@@ -672,15 +672,16 @@ static void serve( int host_fd, Terminal::Complete &terminal, ServerConnection &
 	      /* tell child process of resize */
 	      const Parser::Resize *res = static_cast<const Parser::Resize *>( action );
 	      struct winsize window_size;
+	      memset( &window_size, 0, sizeof( window_size ) );
 	      if ( ioctl( host_fd, TIOCGWINSZ, &window_size ) < 0 ) {
 		perror( "ioctl TIOCGWINSZ" );
-		return;
+		// return;
 	      }
 	      window_size.ws_col = res->width;
 	      window_size.ws_row = res->height;
 	      if ( ioctl( host_fd, TIOCSWINSZ, &window_size ) < 0 ) {
 		perror( "ioctl TIOCSWINSZ" );
-		return;
+		// return;
 	      }
 	    }
 	    terminal_to_host += terminal.act( action );

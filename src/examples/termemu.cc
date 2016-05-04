@@ -221,15 +221,16 @@ static void emulate_terminal( int fd )
 {
   /* get current window size */
   struct winsize window_size;
+  memset( &window_size, 0, sizeof window_size );
   if ( ioctl( STDIN_FILENO, TIOCGWINSZ, &window_size ) < 0 ) {
     perror( "ioctl TIOCGWINSZ" );
-    return;
+    // return;
   }
 
   /* tell child process */
   if ( ioctl( fd, TIOCSWINSZ, &window_size ) < 0 ) {
     perror( "ioctl TIOCSWINSZ" );
-    return;
+    // return;
   }
 
   /* open parser and terminal */
@@ -299,7 +300,7 @@ static void emulate_terminal( int fd )
       /* get new size */
       if ( ioctl( STDIN_FILENO, TIOCGWINSZ, &window_size ) < 0 ) {
 	perror( "ioctl TIOCGWINSZ" );
-	return;
+	// return;
       }
 
       /* tell emulator */
@@ -309,7 +310,7 @@ static void emulate_terminal( int fd )
       /* tell child process */
       if ( ioctl( fd, TIOCSWINSZ, &window_size ) < 0 ) {
 	perror( "ioctl TIOCSWINSZ" );
-	return;
+	// return;
       }
     }
 
