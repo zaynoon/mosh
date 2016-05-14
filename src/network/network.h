@@ -203,6 +203,8 @@ namespace Network {
 
     string recv_input(const Datagram &dgram );
 
+    ssize_t sendto(const Datagram &dgram );
+
     void set_MTU( int family );
 
   public:

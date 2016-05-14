@@ -386,6 +386,40 @@ Connection::Connection( const char *key_str, const char *ip, const char *port ) 
   set_MTU( remote_addr.sa.sa_family );
 }
 
+ssize_t Connection::sendto( const Datagram &dgram )
+{
+  const DatagramAddress &dgram_address = dgram.remote();
+
+  /* Deserialize the interesting bits. */
+  const std::string &remote_address = dgram_address.address(0);
+  const std::string &remote_port = dgram_address.address(1);
+
+  Addr packet_remote_addr;
+  memset( &packet_remote_addr, 0, sizeof packet_remote_addr );
+  switch( dgram_address.family() ) {
+  case DatagramAddress::IPV4_UDP:
+    packet_remote_addr.sa.sa_len = sizeof (sockaddr_in);
+    packet_remote_addr.sa.sa_family = AF_INET;
+    memcpy(&packet_remote_addr.sin.sin_addr, remote_address.data(), 4);
+    memcpy(&packet_remote_addr.sin.sin_port, remote_port.data(), 2);
+    break;
+  case DatagramAddress::IPV6_UDP:
+    packet_remote_addr.sa.sa_len = sizeof (sockaddr_in6);
+    packet_remote_addr.sa.sa_family = AF_INET6;
+    memcpy(&packet_remote_addr.sin6.sin6_addr, remote_address.data(), 16);
+    memcpy(&packet_remote_addr.sin6.sin6_port, remote_port.data(), 2);
+    break;
+  default:
+    return -1;
+  }  
+  
+  const string &p = dgram.payload();
+  return ::sendto( sock(), p.data(), p.size(), MSG_DONTWAIT,
+		   &packet_remote_addr.sa, packet_remote_addr.sa.sa_len );
+
+  
+}
+
 void Connection::send( const string & s )
 {
   if ( !get_has_remote_addr() ) {
@@ -396,8 +430,29 @@ void Connection::send( const string & s )
 
   string p = session.encrypt( px.toMessage() );
 
-  ssize_t bytes_sent = sendto( sock(), p.data(), p.size(), MSG_DONTWAIT,
-			       &remote_addr.sa, remote_addr.sa.sa_len );
+  Datagram dgram;
+
+  dgram.set_payload( p.data(), p.size() );
+
+  DatagramAddress *dgram_address = dgram.mutable_remote();
+  switch(remote_addr.sa.sa_family) {
+  case AF_INET:
+    dgram_address->set_family(DatagramAddress::IPV4_UDP);
+    dgram_address->add_address(reinterpret_cast <const char *>(&remote_addr.sin.sin_addr), 4);
+    dgram_address->add_address(reinterpret_cast <const char *>(&remote_addr.sin.sin_port), 2);
+    break;
+  case AF_INET6:
+    dgram_address->set_family(DatagramAddress::IPV6_UDP);
+    dgram_address->add_address(reinterpret_cast <const char *>(&remote_addr.sin6.sin6_addr), 16);
+    dgram_address->add_address(reinterpret_cast <const char *>(&remote_addr.sin6.sin6_port), 2);
+    break;
+  default:
+    throw NetworkException( "Received unknown address family", errno );
+  }
+  
+
+
+  ssize_t bytes_sent = sendto( dgram );
 
   if ( bytes_sent == static_cast<ssize_t>( p.size() ) ) {
     have_send_exception = false;
