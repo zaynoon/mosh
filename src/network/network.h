@@ -45,8 +45,11 @@
 #include <string.h>
 
 #include "crypto.h"
+#include "datagram.pb.h"
+
 
 using namespace Crypto;
+using namespace DatagramBuffers;
 
 namespace Network {
   static const unsigned int MOSH_PROTOCOL_VERSION = 2; /* bumped for echo-ack */
@@ -159,9 +162,7 @@ namespace Network {
     };
 
     std::deque< Socket > socks;
-    bool has_remote_addr;
     Addr remote_addr;
-    socklen_t remote_addr_len;
 
     bool server;
 
@@ -200,6 +201,8 @@ namespace Network {
 
     string recv_one( int sock_to_recv, bool nonblocking );
 
+    string recv_input(const Datagram &dgram );
+
     void set_MTU( int family );
 
   public:
@@ -216,13 +219,13 @@ namespace Network {
 
     std::string port( void ) const;
     string get_key( void ) const { return key.printable_key(); }
-    bool get_has_remote_addr( void ) const { return has_remote_addr; }
+    bool get_has_remote_addr( void ) const { return remote_addr.sa.sa_len != 0; }
 
     uint64_t timeout( void ) const;
     double get_SRTT( void ) const { return SRTT; }
 
     const Addr &get_remote_addr( void ) const { return remote_addr; }
-    socklen_t get_remote_addr_len( void ) const { return remote_addr_len; }
+    socklen_t get_remote_addr_len( void ) const { return remote_addr.sa.sa_len; }
 
     const NetworkException *get_send_exception( void ) const
     {

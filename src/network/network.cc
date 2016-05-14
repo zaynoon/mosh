@@ -119,7 +119,6 @@ void Connection::hop_port( void )
   assert( !server );
 
   setup();
-  assert( remote_addr_len != 0 );
   socks.push_back( Socket( remote_addr.sa.sa_family ) );
 
   prune_sockets();
@@ -231,9 +230,7 @@ private:
 
 Connection::Connection( const char *desired_ip, const char *desired_port ) /* server */
   : socks(),
-    has_remote_addr( false ),
     remote_addr(),
-    remote_addr_len( 0 ),
     server( true ),
     MTU( DEFAULT_SEND_MTU ),
     key(),
@@ -251,6 +248,8 @@ Connection::Connection( const char *desired_ip, const char *desired_port ) /* se
     have_send_exception( false ),
     send_exception()
 {
+  memset( &remote_addr, 0, sizeof remote_addr );
+
   setup();
 
   /* The mosh wrapper always gives an IP request, in order
@@ -351,9 +350,7 @@ bool Connection::try_bind( const char *addr, int port_low, int port_high )
 
 Connection::Connection( const char *key_str, const char *ip, const char *port ) /* client */
   : socks(),
-    has_remote_addr( false ),
     remote_addr(),
-    remote_addr_len( 0 ),
     server( false ),
     MTU( DEFAULT_SEND_MTU ),
     key( key_str ),
@@ -381,10 +378,8 @@ Connection::Connection( const char *key_str, const char *ip, const char *port ) 
   hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
   AddrInfo ai( ip, port, &hints );
   fatal_assert( static_cast<size_t>( ai.res->ai_addrlen ) <= sizeof( remote_addr ) );
-  remote_addr_len = ai.res->ai_addrlen;
-  memcpy( &remote_addr.sa, ai.res->ai_addr, remote_addr_len );
-
-  has_remote_addr = true;
+  memset( &remote_addr, 0, sizeof remote_addr );
+  memcpy( &remote_addr.sa, ai.res->ai_addr, ai.res->ai_addrlen );
 
   socks.push_back( Socket( remote_addr.sa.sa_family ) );
 
@@ -393,7 +388,7 @@ Connection::Connection( const char *key_str, const char *ip, const char *port ) 
 
 void Connection::send( const string & s )
 {
-  if ( !has_remote_addr ) {
+  if ( !get_has_remote_addr() ) {
     return;
   }
 
@@ -402,7 +397,7 @@ void Connection::send( const string & s )
   string p = session.encrypt( px.toMessage() );
 
   ssize_t bytes_sent = sendto( sock(), p.data(), p.size(), MSG_DONTWAIT,
-			       &remote_addr.sa, remote_addr_len );
+			       &remote_addr.sa, remote_addr.sa.sa_len );
 
   if ( bytes_sent == static_cast<ssize_t>( p.size() ) ) {
     have_send_exception = false;
@@ -421,7 +416,7 @@ void Connection::send( const string & s )
   uint64_t now = timestamp();
   if ( server ) {
     if ( now - last_heard > SERVER_ASSOCIATION_TIMEOUT ) {
-      has_remote_addr = false;
+      memset( &remote_addr, 0, sizeof remote_addr );
       fprintf( stderr, "Server now detached from client.\n" );
     }
   } else { /* client */
@@ -462,6 +457,9 @@ string Connection::recv( void )
 
 string Connection::recv_one( int sock_to_recv, bool nonblocking )
 {
+  /* Marshal packet into this. */
+  Datagram dgram;
+
   /* receive source address, ECN, and payload in msghdr structure */
   Addr packet_remote_addr;
   struct msghdr header;
@@ -497,9 +495,25 @@ string Connection::recv_one( int sock_to_recv, bool nonblocking )
     throw NetworkException( "Received oversize datagram", errno );
   }
 
-  /* receive ECN */
-  bool congestion_experienced = false;
+  dgram.set_payload( msg_payload, received_len );
 
+  DatagramAddress *dgram_address = dgram.mutable_remote();
+  switch(packet_remote_addr.sa.sa_family) {
+  case AF_INET:
+    dgram_address->set_family(DatagramAddress::IPV4_UDP);
+    dgram_address->add_address(reinterpret_cast <const char *>(&packet_remote_addr.sin.sin_addr), 4);
+    dgram_address->add_address(reinterpret_cast <const char *>(&packet_remote_addr.sin.sin_port), 2);
+    break;
+  case AF_INET6:
+    dgram_address->set_family(DatagramAddress::IPV6_UDP);
+    dgram_address->add_address(reinterpret_cast <const char *>(&packet_remote_addr.sin6.sin6_addr), 4);
+    dgram_address->add_address(reinterpret_cast <const char *>(&packet_remote_addr.sin6.sin6_port), 2);
+    break;
+  default:
+    throw NetworkException( "Received unknown address family", errno );
+  }
+  
+  /* receive ECN */
   struct cmsghdr *ecn_hdr = CMSG_FIRSTHDR( &header );
   if ( ecn_hdr
        && (ecn_hdr->cmsg_level == IPPROTO_IP)
@@ -509,11 +523,55 @@ string Connection::recv_one( int sock_to_recv, bool nonblocking )
     assert( ecn_octet_p );
 
     if ( (*ecn_octet_p & 0x03) == 0x03 ) {
-      congestion_experienced = true;
+      dgram.add_notification(Datagram::ECN_CONGESTION);
     }
   }
+  
+  return recv_input( dgram );
+}
+  
+string Connection::recv_input(const Datagram &dgram)
+{
+  /* Validate required fields in received message. */
+  if (!(dgram.has_payload() &&
+	dgram.has_remote()) ) {
+    throw( NetworkException( "" ) );
+  }
+  const DatagramAddress &dgram_address = dgram.remote();
+  if (!(dgram_address.has_family() &&
+	dgram_address.address_size() >= 2 &&
+	((dgram_address.family() == DatagramAddress::IPV4_UDP &&
+	  dgram_address.address(0).size() == 4 &&
+	  dgram_address.address(1).size() == 2) ||
+	 (dgram_address.family() == DatagramAddress::IPV6_UDP &&
+	  dgram_address.address(0).size() == 16 &&
+	  dgram_address.address(1).size() == 2)))) {
+    throw( NetworkException( "" ) );
+  }
+  /* Deserialize the interesting bits. */
+  const std::string &remote_port = dgram_address.address(0);
+  const std::string &remote_address = dgram_address.address(1);
 
-  Packet p( session.decrypt( msg_payload, received_len ) );
+  Addr packet_remote_addr;
+  memset( &packet_remote_addr, 0, sizeof packet_remote_addr );
+  switch( dgram_address.family() ) {
+  case DatagramAddress::IPV4_UDP:
+    packet_remote_addr.sa.sa_len = sizeof (sockaddr_in);
+    packet_remote_addr.sa.sa_family = AF_INET;
+    memcpy(&packet_remote_addr.sin.sin_addr, remote_address.data(), 4);
+    memcpy(&packet_remote_addr.sin.sin_port, remote_port.data(), 2);
+    break;
+  case DatagramAddress::IPV6_UDP:
+    packet_remote_addr.sa.sa_len = sizeof (sockaddr_in6);
+    packet_remote_addr.sa.sa_family = AF_INET6;
+    memcpy(&packet_remote_addr.sin6.sin6_addr, remote_address.data(), 16);
+    memcpy(&packet_remote_addr.sin6.sin6_port, remote_port.data(), 2);
+    break;
+  default:
+    throw( NetworkException( "" ));
+  }  
+  
+  Packet p( session.decrypt( dgram.payload().data(), dgram.payload().size() ));
 
   dos_assert( p.direction == (server ? TO_SERVER : TO_CLIENT) ); /* prevent malicious playback to sender */
 
@@ -525,12 +583,15 @@ string Connection::recv_one( int sock_to_recv, bool nonblocking )
       saved_timestamp = p.timestamp;
       saved_timestamp_received_at = timestamp();
 
-      if ( congestion_experienced ) {
-	/* signal counterparty to slow down */
-	/* this will gradually slow the counterparty down to the minimum frame rate */
-	saved_timestamp -= CONGESTION_TIMESTAMP_PENALTY;
-	if ( server ) {
-	  fprintf( stderr, "Received explicit congestion notification.\n" );
+      for(int i = 0; i < dgram.notification_size(); i++) {
+	if ( dgram.notification(i) == Datagram::ECN_CONGESTION ) {
+	  /* signal counterparty to slow down */
+	  /* this will gradually slow the counterparty down to the minimum frame rate */
+	  saved_timestamp -= CONGESTION_TIMESTAMP_PENALTY;
+	  if ( server ) {
+	    fprintf( stderr, "Received explicit congestion notification.\n" );
+	  }
+	  break;
 	}
       }
     }
@@ -555,16 +616,13 @@ string Connection::recv_one( int sock_to_recv, bool nonblocking )
     }
 
     /* auto-adjust to remote host */
-    has_remote_addr = true;
     last_heard = timestamp();
 
     if ( server ) { /* only client can roam */
-      if ( remote_addr_len != header.msg_namelen ||
-	   memcmp( &remote_addr, &packet_remote_addr, remote_addr_len ) != 0 ) {
+      if ( memcmp( &remote_addr, &packet_remote_addr, sizeof remote_addr ) != 0 ) {
 	remote_addr = packet_remote_addr;
-	remote_addr_len = header.msg_namelen;
 	char host[ NI_MAXHOST ], serv[ NI_MAXSERV ];
-	int errcode = getnameinfo( &remote_addr.sa, remote_addr_len,
+	int errcode = getnameinfo( &remote_addr.sa, remote_addr.sa.sa_len,
 				   host, sizeof( host ), serv, sizeof( serv ),
 				   NI_DGRAM | NI_NUMERICHOST | NI_NUMERICSERV );
 	if ( errcode != 0 ) {

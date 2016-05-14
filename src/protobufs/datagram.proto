@@ -1,0 +1,32 @@
+syntax = "proto2";
+
+option optimize_for = LITE_RUNTIME;
+
+package DatagramBuffers;
+
+//
+// Since datagrams are Mosh's most frequent message type, optimize for size
+// and use tags below 16
+//
+
+message DatagramAddress {
+  enum AddressFamily {
+    UNKNOWN = 10;
+    IPV4_UDP = 11;
+    IPV6_UDP = 12;
+  }
+  optional AddressFamily family = 13;
+  repeated bytes address = 14; // Network-order bytes for the address.
+}
+
+message Datagram {
+  optional bytes payload = 1; // copied to/from Connection::Packet
+  optional DatagramAddress remote = 2; // "remote" is the other Mosh partner
+  optional DatagramAddress local = 3;  // "local" is this Mosh partner
+  // Notifications are expected to be rare, so their tag nums are out of line
+  enum Notification {
+    NONE = 100;
+    ECN_CONGESTION = 101;
+  }
+  repeated Notification notification = 102; 
+}
