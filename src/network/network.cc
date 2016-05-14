@@ -506,7 +506,7 @@ string Connection::recv_one( int sock_to_recv, bool nonblocking )
     break;
   case AF_INET6:
     dgram_address->set_family(DatagramAddress::IPV6_UDP);
-    dgram_address->add_address(reinterpret_cast <const char *>(&packet_remote_addr.sin6.sin6_addr), 4);
+    dgram_address->add_address(reinterpret_cast <const char *>(&packet_remote_addr.sin6.sin6_addr), 16);
     dgram_address->add_address(reinterpret_cast <const char *>(&packet_remote_addr.sin6.sin6_port), 2);
     break;
   default:
@@ -549,8 +549,8 @@ string Connection::recv_input(const Datagram &dgram)
     throw( NetworkException( "" ) );
   }
   /* Deserialize the interesting bits. */
-  const std::string &remote_port = dgram_address.address(0);
-  const std::string &remote_address = dgram_address.address(1);
+  const std::string &remote_address = dgram_address.address(0);
+  const std::string &remote_port = dgram_address.address(1);
 
   Addr packet_remote_addr;
   memset( &packet_remote_addr, 0, sizeof packet_remote_addr );
