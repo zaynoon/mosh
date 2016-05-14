@@ -27,4 +27,4 @@ ntester_LDADD = ../statesync/libmoshstatesync.a ../terminal/libmoshterminal.a ..
 
 benchmark_SOURCES = benchmark.cc
 benchmark_CPPFLAGS = -I$(srcdir)/../util -I$(srcdir)/../statesync -I$(srcdir)/../terminal -I../protobufs -I$(srcdir)/../frontend -I$(srcdir)/../crypto -I$(srcdir)/../network $(protobuf_CFLAGS)
-benchmark_LDADD = ../frontend/terminaloverlay.o ../statesync/libmoshstatesync.a ../terminal/libmoshterminal.a ../protobufs/libmoshprotos.a ../network/libmoshnetwork.a ../crypto/libmoshcrypto.a ../util/libmoshutil.a $(STDDJB_LDFLAGS) $(LIBUTIL) -lm $(TINFO_LIBS) $(protobuf_LIBS) $(CRYPTO_LIBS)
+benchmark_LDADD = ../frontend/terminaloverlay.o ../network/libmoshnetwork.a ../crypto/libmoshcrypto.a ../statesync/libmoshstatesync.a ../terminal/libmoshterminal.a ../protobufs/libmoshprotos.a ../util/libmoshutil.a $(STDDJB_LDFLAGS) $(LIBUTIL) -lm $(TINFO_LIBS) $(protobuf_LIBS) $(CRYPTO_LIBS)
