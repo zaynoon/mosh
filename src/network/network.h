@@ -199,6 +199,10 @@ namespace Network {
 
     void prune_sockets( void );
 
+    Datagram datagram_pack( const string &payload, const Addr &remote_addr );
+
+    int datagram_unpack( const Datagram &dgram, string &payload, Addr &remote_addr );
+
     string recv_one( int sock_to_recv, bool nonblocking );
 
     string recv_input(const Datagram &dgram );
