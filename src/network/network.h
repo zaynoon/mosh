@@ -203,6 +203,8 @@ namespace Network {
 
     int datagram_unpack( const Datagram &dgram, string &payload, Addr &remote_addr );
 
+    bool datagram_validate( const Datagram &dgram );
+
     string recv_one( int sock_to_recv, bool nonblocking );
 
     string recv_input(const Datagram &dgram );

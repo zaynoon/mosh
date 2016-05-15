@@ -386,7 +386,8 @@ Connection::Connection( const char *key_str, const char *ip, const char *port ) 
   set_MTU( remote_addr.sa.sa_family );
 }
 
-Datagram Connection::datagram_pack( const string &payload, const Addr &remote_addr ) {
+Datagram Connection::datagram_pack( const string &payload, const Addr &remote_addr )
+{
   Datagram dgram;
   dgram.set_payload( payload.data(), payload.size() );
 
@@ -438,6 +439,27 @@ int Connection::datagram_unpack( const Datagram &dgram, string &payload, Addr &r
   return payload.size();
 }
 
+
+bool Connection::datagram_validate( const Datagram &dgram ) 
+{
+  /* Validate required fields in received message. */
+  if (!(dgram.has_payload() &&
+	dgram.has_remote()) ) {
+    return false;
+  }
+  const DatagramAddress &dgram_address = dgram.remote();
+  if (!(dgram_address.has_family() &&
+	dgram_address.address_size() >= 2 &&
+	((dgram_address.family() == DatagramAddress::IPV4_UDP &&
+	  dgram_address.address(0).size() == 4 &&
+	  dgram_address.address(1).size() == 2) ||
+	 (dgram_address.family() == DatagramAddress::IPV6_UDP &&
+	  dgram_address.address(0).size() == 16 &&
+	  dgram_address.address(1).size() == 2)))) {
+    return false;
+  }
+  return true;
+}
 
 ssize_t Connection::sendto( const Datagram &dgram )
 {
@@ -582,44 +604,22 @@ string Connection::recv_one( int sock_to_recv, bool nonblocking )
   
 string Connection::recv_input(const Datagram &dgram)
 {
+  if ( !datagram_validate( dgram )) {
+    throw( NetworkException( "Incomplete/bad datagram" ));
+  }
   /* Validate required fields in received message. */
   if (!(dgram.has_payload() &&
 	dgram.has_remote()) ) {
     throw( NetworkException( "" ) );
   }
-  const DatagramAddress &dgram_address = dgram.remote();
-  if (!(dgram_address.has_family() &&
-	dgram_address.address_size() >= 2 &&
-	((dgram_address.family() == DatagramAddress::IPV4_UDP &&
-	  dgram_address.address(0).size() == 4 &&
-	  dgram_address.address(1).size() == 2) ||
-	 (dgram_address.family() == DatagramAddress::IPV6_UDP &&
-	  dgram_address.address(0).size() == 16 &&
-	  dgram_address.address(1).size() == 2)))) {
-    throw( NetworkException( "" ) );
-  }
-  /* Deserialize the interesting bits. */
-  const std::string &remote_address = dgram_address.address(0);
-  const std::string &remote_port = dgram_address.address(1);
 
+  string payload;
   Addr packet_remote_addr;
-  memset( &packet_remote_addr, 0, sizeof packet_remote_addr );
-  switch( dgram_address.family() ) {
-  case DatagramAddress::IPV4_UDP:
-    packet_remote_addr.sa.sa_len = sizeof (sockaddr_in);
-    packet_remote_addr.sa.sa_family = AF_INET;
-    memcpy(&packet_remote_addr.sin.sin_addr, remote_address.data(), 4);
-    memcpy(&packet_remote_addr.sin.sin_port, remote_port.data(), 2);
-    break;
-  case DatagramAddress::IPV6_UDP:
-    packet_remote_addr.sa.sa_len = sizeof (sockaddr_in6);
-    packet_remote_addr.sa.sa_family = AF_INET6;
-    memcpy(&packet_remote_addr.sin6.sin6_addr, remote_address.data(), 16);
-    memcpy(&packet_remote_addr.sin6.sin6_port, remote_port.data(), 2);
-    break;
-  default:
-    throw( NetworkException( "" ));
-  }  
+  int rv = datagram_unpack( dgram, payload, packet_remote_addr );
+
+  if ( rv < 0 ) {
+    throw( NetworkException( "Invalid Datagram" ));
+  }
   
   Packet p( session.decrypt( dgram.payload().data(), dgram.payload().size() ));
 
