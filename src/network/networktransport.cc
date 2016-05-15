@@ -55,6 +55,20 @@ Transport<MyState, RemoteState>::Transport( MyState &initial_state, RemoteState 
 
 template <class MyState, class RemoteState>
 Transport<MyState, RemoteState>::Transport( MyState &initial_state, RemoteState &initial_remote,
+					    const char *file )
+  : connection( file ),
+    sender( &connection, initial_state ),
+    received_states( 1, TimestampedState<RemoteState>( timestamp(), 0, initial_remote ) ),
+    receiver_quench_timer( 0 ),
+    last_receiver_state( initial_remote ),
+    fragments(),
+    verbose( false )
+{
+  /* server to moshd */
+}
+
+template <class MyState, class RemoteState>
+Transport<MyState, RemoteState>::Transport( MyState &initial_state, RemoteState &initial_remote,
 					    const char *key_str, const char *ip, const char *port )
   : connection( key_str, ip, port ),
     sender( &connection, initial_state ),

@@ -37,6 +37,7 @@
 #ifdef HAVE_SYS_UIO_H
 #include <sys/uio.h>
 #endif
+#include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <assert.h>
@@ -147,8 +148,16 @@ void Connection::prune_sockets( void )
   }
 }
 
+Connection::Socket::Socket( int family, int fd )
+  : _fd( fd ), _connection( true )
+{
+  if ( _fd < 0 ) {
+    throw NetworkException( "socket", errno );
+  }
+}
+
 Connection::Socket::Socket( int family )
-  : _fd( socket( family, SOCK_DGRAM, 0 ) )
+  : _fd( socket( family, SOCK_DGRAM, 0 ) ), _connection( false )
 {
   if ( _fd < 0 ) {
     throw NetworkException( "socket", errno );
@@ -227,6 +236,53 @@ private:
   AddrInfo(const AddrInfo &);
   AddrInfo &operator=(const AddrInfo &);
 };
+
+Connection::Connection( const char *file ) /* server to moshd */
+  : socks(),
+    remote_addr(),
+    server( true ),
+    MTU( DEFAULT_SEND_MTU ),
+    key(),
+    session( key ),
+    direction( TO_CLIENT ),
+    saved_timestamp( -1 ),
+    saved_timestamp_received_at( 0 ),
+    expected_receiver_seq( 0 ),
+    last_heard( -1 ),
+    last_port_choice( -1 ),
+    last_roundtrip_success( -1 ),
+    RTT_hit( false ),
+    SRTT( 1000 ),
+    RTTVAR( 500 ),
+    have_send_exception( false ),
+    send_exception()
+{
+  memset( &remote_addr, 0, sizeof remote_addr );
+
+  setup();
+
+  int fd;
+  char *end;
+  long value;
+
+  /* parse first (only?) port */
+  errno = 0;
+  value = strtol( file, &end, 10 );
+  if ( errno != 0 || *end == 0 ) {
+    fprintf( stderr, "using fd %ld\n", value );
+    fd = value;
+  } else {
+    fd = open( file, O_RDWR );
+    fprintf( stderr, "opened file %s (%d)\n", file, fd );
+    if ( fd < 0 ) {
+      throw( "Cannot open socket", errno );
+    }
+  }
+
+  socks.push_back( Socket( 0, fd ) );
+
+  return;
+}
 
 Connection::Connection( const char *desired_ip, const char *desired_port ) /* server */
   : socks(),
@@ -463,6 +519,10 @@ bool Connection::datagram_validate( const Datagram &dgram )
 
 ssize_t Connection::sendto( const Datagram &dgram )
 {
+  if ( socks.size() == 1 && socks.front().connection() ) {
+    return socks.front().send_message( dgram.SerializeAsString() );
+  }
+
   string p;
   Addr packet_remote_addr;
   int rv = datagram_unpack( dgram, p, packet_remote_addr );
@@ -521,13 +581,13 @@ void Connection::send( const string & s )
 string Connection::recv( void )
 {
   assert( !socks.empty() );
-  for ( std::deque< Socket >::const_iterator it = socks.begin();
+  for ( std::deque< Socket >::iterator it = socks.begin();
 	it != socks.end();
 	it++ ) {
     bool islast = (it + 1) == socks.end();
     string payload;
     try {
-      payload = recv_one( it->fd(), !islast );
+      payload = recv_one( *it, !islast );
     } catch ( NetworkException & e ) {
       if ( (e.the_errno == EAGAIN)
 	   || (e.the_errno == EWOULDBLOCK) ) {
@@ -546,8 +606,13 @@ string Connection::recv( void )
   return "";
 }
 
-string Connection::recv_one( int sock_to_recv, bool nonblocking )
+string Connection::recv_one( Socket &sock_to_recv, bool nonblocking )
 {
+  if ( sock_to_recv.connection() ) {
+    Datagram dgram;
+    dgram.ParseFromString( sock_to_recv.recv_message( nonblocking ));
+    return recv_input( dgram );
+  }
   /* receive source address, ECN, and payload in msghdr structure */
   Addr packet_remote_addr;
   struct msghdr header;
@@ -573,7 +638,7 @@ string Connection::recv_one( int sock_to_recv, bool nonblocking )
   /* receive flags */
   header.msg_flags = 0;
 
-  ssize_t received_len = recvmsg( sock_to_recv, &header, nonblocking ? MSG_DONTWAIT : 0 );
+  ssize_t received_len = recvmsg( sock_to_recv.fd(), &header, nonblocking ? MSG_DONTWAIT : 0 );
 
   if ( received_len < 0 ) {
     throw NetworkException( "recvmsg", errno );
@@ -763,8 +828,56 @@ Connection::Socket & Connection::Socket::operator=( const Socket & other )
   if ( dup2( other._fd, _fd ) < 0 ) {
     throw NetworkException( "socket", errno );
   }
-
+  if ( _connection ) {
+    throw NetworkException( "connected socket" );
+  }
   return *this;
+}
+
+string Connection::Socket::recv_message( bool nonblocking )
+{
+  int flags = nonblocking ? MSG_DONTWAIT : 0;
+  /* Get the length word */
+  while( messagesize_received < 4 ) {
+    int rbytes = ::recv( _fd, messagesizebytes.b + messagesize_received, 4 - messagesize_received, flags );
+    if ( rbytes == -1 ) {
+      return string();
+    }
+    messagesize_received += rbytes;
+    if ( messagesize_received == 4 ) {
+      messagesize = htonl(messagesizebytes.i);
+      buffer.resize(messagesize);
+      message_received = 0;
+    }
+  }
+  if ( messagesize_received < 4 ) {
+    return string();
+  }
+  /* Get the message */
+  while ( message_received < messagesize ) {
+    int rbytes = ::recv( _fd, reinterpret_cast<char *>(buffer.data()) + message_received, messagesize - message_received, flags );
+    if ( rbytes == -1 ) {
+      return string();
+    }
+    message_received += rbytes;
+  }
+  messagesize_received = 0;
+  return string(buffer.begin(), buffer.end());
+}
+
+ssize_t Connection::Socket::send_message( const string &dgram )
+{
+  union {
+    uint32_t i;
+    uint8_t  c[4];
+  } u;
+  u.i = htonl( dgram.size() );
+  int wbytes = ::send( _fd, u.c, 4, 0 );
+  if (wbytes < 4) {
+    return -1;
+  }
+  wbytes = ::send ( _fd, dgram.data(), dgram.size(), 0 );
+  return wbytes;
 }
 
 bool Connection::parse_portrange( const char * desired_port, int & desired_port_low, int & desired_port_high )

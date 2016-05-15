@@ -151,14 +151,29 @@ namespace Network {
     {
     private:
       int _fd;
+      bool _connection; // True if this is a bytestream and we need to packetize.
+      // Buffer for packetized reads from bytestream.
+      int32_t messagesize;
+      int32_t messagesize_received;
+      union {
+	uint32_t i;
+	uint8_t b[4];
+      } messagesizebytes;
+      std::vector<char> buffer;
+      uint32_t message_received;
 
     public:
       int fd( void ) const { return _fd; }
+      int connection( void ) const { return _connection; }
       Socket( int family );
+      Socket( int family, int fd );
       ~Socket();
 
       Socket( const Socket & other );
       Socket & operator=( const Socket & other );
+
+      string recv_message( bool nonblocking );
+      ssize_t send_message( const string &dgram );
     };
 
     std::deque< Socket > socks;
@@ -205,7 +220,9 @@ namespace Network {
 
     bool datagram_validate( const Datagram &dgram );
 
-    string recv_one( int sock_to_recv, bool nonblocking );
+    Datagram recv_connected( Socket &sock_to_recv );
+
+    string recv_one( Socket &sock_to_recv, bool nonblocking );
 
     string recv_input(const Datagram &dgram );
 
@@ -217,6 +234,7 @@ namespace Network {
     /* Network transport overhead. */
     static const int ADDED_BYTES = 8 /* seqno/nonce */ + 4 /* timestamps */;
 
+    Connection( const char *file ); /* moshd */
     Connection( const char *desired_ip, const char *desired_port ); /* server */
     Connection( const char *key_str, const char *ip, const char *port ); /* client */
 

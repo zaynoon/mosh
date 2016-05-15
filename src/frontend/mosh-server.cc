@@ -100,6 +100,7 @@ static void serve( int host_fd,
 		   long network_signaled_timeout );
 
 static int run_server( const char *desired_ip, const char *desired_port,
+		       const char *desired_file,
 		       const string &command_path, char *command_argv[],
 		       const int colors, bool verbose, bool with_motd );
 
@@ -167,6 +168,7 @@ int main( int argc, char *argv[] )
   const char *desired_ip = NULL;
   string desired_ip_str;
   const char *desired_port = NULL;
+  const char *desired_file = NULL;
   string command_path;
   char **command_argv = NULL;
   int colors = 0;
@@ -194,7 +196,7 @@ int main( int argc, char *argv[] )
        && (strcmp( argv[ 1 ], "new" ) == 0) ) {
     /* new option syntax */
     int opt;
-    while ( (opt = getopt( argc - 1, argv + 1, "@:i:p:c:svl:" )) != -1 ) {
+    while ( (opt = getopt( argc - 1, argv + 1, "@:i:p:c:svl:f:" )) != -1 ) {
       switch ( opt ) {
 	/*
 	 * This undocumented option does nothing but eat its argument.
@@ -219,6 +221,9 @@ int main( int argc, char *argv[] )
 	  desired_ip = desired_ip_str.c_str();
 	  fatal_assert( desired_ip );
 	}
+	break;
+      case 'f':
+	desired_file = optarg;
 	break;
       case 'c':
 	try {
@@ -340,7 +345,7 @@ int main( int argc, char *argv[] )
   }
 
   try {
-    return run_server( desired_ip, desired_port, command_path, command_argv, colors, verbose, with_motd );
+    return run_server( desired_ip, desired_port, desired_file, command_path, command_argv, colors, verbose, with_motd );
   } catch ( const Network::NetworkException &e ) {
     fprintf( stderr, "Network exception: %s\n",
 	     e.what() );
@@ -353,6 +358,7 @@ int main( int argc, char *argv[] )
 }
 
 static int run_server( const char *desired_ip, const char *desired_port,
+		       const char *desired_file,
 		       const string &command_path, char *command_argv[],
 		       const int colors, bool verbose, bool with_motd ) {
   /* get network idle timeout */
@@ -402,13 +408,20 @@ static int run_server( const char *desired_ip, const char *desired_port,
 
   /* open network */
   Network::UserStream blank;
-  ServerConnection *network = new ServerConnection( terminal, blank, desired_ip, desired_port );
-
+  ServerConnection *network;
+  if ( desired_file ) {
+    network = new ServerConnection( terminal, blank, desired_file );
+  } else {
+    network = new ServerConnection( terminal, blank, desired_ip, desired_port );
+  }
+  
   if ( verbose ) {
     network->set_verbose();
   }
 
-  printf( "\nMOSH CONNECT %s %s\n", network->port().c_str(), network->get_key().c_str() );
+  if ( !desired_file ) {
+    printf( "\nMOSH CONNECT %s %s\n", network->port().c_str(), network->get_key().c_str() );
+  }
   fflush( stdout );
 
   /* don't let signals kill us */
