@@ -470,8 +470,8 @@ string Connection::recv_one( int sock_to_recv, bool nonblocking )
   char msg_control[ Session::RECEIVE_MTU ];
 
   /* receive source address */
-  header.msg_name = &packet_remote_addr.sa;
-  header.msg_namelen = sizeof packet_remote_addr.sa;
+  header.msg_name = &packet_remote_addr;
+  header.msg_namelen = sizeof packet_remote_addr;
 
   /* receive payload */
   msg_iovec.iov_base = msg_payload;
