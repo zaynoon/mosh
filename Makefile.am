@@ -2,8 +2,10 @@ ACLOCAL_AMFLAGS = -I m4
 SUBDIRS = scripts src man conf
 EXTRA_DIST = autogen.sh ocb-license.html README.md COPYING.iOS
 BUILT_SOURCES = version.h
-CLANG_SCAN_BUILD = scan-build
 AM_DISTCHECK_CONFIGURE_FLAGS = --enable-compile-warnings=distcheck --enable-examples
+
+# non-Automake defines
+CLANG_SCAN_BUILD = scan-build
 
 .PHONY:	VERSION
 
@@ -29,6 +31,8 @@ version.h:	VERSION
 clean-local:
 	@rm -rf version.h VERSION cov-int mosh-coverity.txz
 
+# Linters and static checkers, for development only.  Not included in
+# build dependencies, and outside of Automake processing.
 cppcheck: $(BUILT_SOURCES) config.h
 	cppcheck --enable=all --template=gcc -include config.h -I . \
 		-I src/crypto -I src/frontend -I src/network -I src/protobufs \
@@ -36,10 +40,14 @@ cppcheck: $(BUILT_SOURCES) config.h
 		-I /usr/include -I /usr/include/google/protobuf -I/usr/include/openssl \
 		.
 
+# Coverity.
 cov-build: $(BUILT_SOURCES) config.h
-	$(MAKE) clean && rm -rf cov-int && \
-		cov-build --dir cov-int $(MAKE) check && \
-		tar -caf mosh-coverity.txz cov-int
+	$(MAKE) clean
+	rm -rf cov-int
+	cov-build --dir cov-int $(MAKE) check TESTS=
+	tar -caf mosh-coverity.txz cov-int
 
+# Clang's scan-build static checker.
 scan-build: $(BUILT_SOURCES) config.h
-	$(MAKE) clean && $(CLANG_SCAN_BUILD) $(MAKE) check
+	$(MAKE) clean
+	$(CLANG_SCAN_BUILD) $(MAKE) check TESTS=
