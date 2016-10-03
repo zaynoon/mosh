@@ -5,6 +5,7 @@ BUILT_SOURCES = version.h
 AM_DISTCHECK_CONFIGURE_FLAGS = --enable-compile-warnings=distcheck --enable-examples
 
 # non-Automake defines
+CPPCHECK_FLAGS = --enable=all --template=gcc --force # -j8 disables unused function checking.
 CLANG_SCAN_BUILD = scan-build
 BEAR = bear
 OCLINT_JCD = oclint-json-compilation-database
@@ -40,7 +41,7 @@ clean-local:
 # Linters and static checkers, for development only.  Not included in
 # build dependencies, and outside of Automake processing.
 cppcheck: $(BUILT_SOURCES) config.h
-	cppcheck --enable=all --template=gcc -include config.h -I . \
+	cppcheck $(CPPCHECK_FLAGS) -include config.h -I . \
 		-I src/crypto -I src/frontend -I src/network -I src/protobufs \
 		-I src/statesync -I src/terminal -I src/util \
 		-I /usr/include -I /usr/include/google/protobuf -I/usr/include/openssl \
