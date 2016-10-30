@@ -44,6 +44,7 @@ deploy:
   on:
     repo: cgull/mosh
     tags: true
+    condition: $TRAVIS_OS_NAME = osx
 
 notifications:
   irc:
