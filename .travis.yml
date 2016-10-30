@@ -30,6 +30,8 @@ before_install:
 script:
   - ./autogen.sh
   - ./configure --enable-compile-warnings=error --enable-examples
+  - git describe
+  - cat ./VERSION
   - make distcheck VERBOSE=1 V=1
   - if test "$TRAVIS_OS_NAME" = osx -a -n "$TRAVIS_TAG"; then sh -c "cd macosx && env MACOSX_DEPLOYMENT_TARGET=10.10 ./build.sh && shasum -a 256 *.pkg"; fi
 
