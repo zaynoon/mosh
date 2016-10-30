@@ -29,7 +29,8 @@ before_install:
 script:
   - ./autogen.sh
   - ./configure --enable-compile-warnings=error --enable-examples
-  - make distcheck VERBOSE=1
+  - make distcheck VERBOSE=1 V=1
+  - if test -n "$TRAVIS_TAG"; then sh -c "cd macosx && env MACOSX_DEPLOYMENT_TARGET=10.9 ./build.sh"; fi
 
 notifications:
   irc:
