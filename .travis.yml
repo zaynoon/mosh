@@ -14,11 +14,13 @@ dist: trusty
 addons:
   apt:
     packages:
+    # For build.
     - protobuf-compiler
     - libprotobuf-dev
     - libutempter-dev
-    - tmux			# test suite
-    - perl			# test suite
+    # Test suite needs these.
+    - tmux
+    - perl
 
 before_install:
   - if test osx = "${TRAVIS_OS_NAME}"; then brew update; fi
