@@ -32,9 +32,7 @@ addons:
 # OS X dependencies.  For tag builds, reinstall protobuf with
 # --universal --bottle to get a fat library that will run on any
 # machine.  (This takes about 15 minutes on current Travis
-# infrastructure.)  Unfortunately, the Travis GitHub deployment module
-# cannot do wildcards, so we must give the package a fixed name before
-# uploading it.
+# infrastructure.)
 before_install:
   - if test osx = "${TRAVIS_OS_NAME}"; then brew update; fi
   - if test osx = "${TRAVIS_OS_NAME}"; then brew reinstall protobuf; fi
@@ -47,6 +45,10 @@ script:
   - ./autogen.sh
   - ./configure --enable-compile-warnings=error --enable-examples
   - make distcheck VERBOSE=1 V=1
+  # Build OS X package for tags.
+  # Unfortunately, the Travis GitHub deployment module cannot do
+  # wildcards, so we must give the package a fixed name before
+  # uploading it.
   - if test osx = "${TRAVIS_OS_NAME}" && test -n "${TRAVIS_TAG}"; then sh -c "cd macosx && env MACOSX_DEPLOYMENT_TARGET=10.10 ./build.sh && ln ${TRAVIS_TAG}.pkg mosh.pkg && shasum -a 256 mosh.pkg"; fi
 
 # Deploy the OS X package to a GitHub release.
