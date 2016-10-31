@@ -38,21 +38,14 @@ addons:
 before_install:
   - if test osx = "${TRAVIS_OS_NAME}"; then brew update; fi
   - if test osx = "${TRAVIS_OS_NAME}"; then brew reinstall protobuf; fi
-  - if test osx = "${TRAVIS_OS_NAME}" && test -n "${TRAVIS_TAG}"; then echo reinstall protobuf; brew rm protobuf && travis_wait 30 brew install protobuf --universal --bottle; fi
+  - if test osx = "${TRAVIS_OS_NAME}" && test -n "${TRAVIS_TAG}"; then brew rm protobuf && travis_wait 30 brew install protobuf --universal --bottle; fi
   - if test osx = "${TRAVIS_OS_NAME}"; then brew reinstall tmux; fi
-  - git tag
-  - git fetch --tags
-  - git fetch --unshallow
-  - git fetch --tags
-  - git tag
+  - git fetch --tags --unshallow
 
 # 'make distcheck', and OS X package build on tag builds.
 script:
   - ./autogen.sh
   - ./configure --enable-compile-warnings=error --enable-examples
-  - git describe
-  - make VERSION
-  - cat ./VERSION
   - make distcheck VERBOSE=1 V=1
   - if test osx = "${TRAVIS_OS_NAME}" && test -n "${TRAVIS_TAG}"; then sh -c "cd macosx && env MACOSX_DEPLOYMENT_TARGET=10.10 ./build.sh && ln ${TRAVIS_TAG}.pkg mosh.pkg && shasum -a 256 mosh.pkg"; fi
 
