@@ -1,5 +1,5 @@
-osx_image: xcode8
-
+# This does Travis CI builds on Linux and OS X, and on a tag build,
+# also produces an OS X package.
 os:
   - linux
   - osx
@@ -8,28 +8,61 @@ cache:
   - apt
 
 language: cpp
+
+# Use the Ubuntu 14.04 build environment for Linux.
 sudo: required
 dist: trusty
 
+# Currently we're using the Travis Xcode 7.1/OS X 10.10 image to
+# get i386/x86_64 fat binaries.
+osx_image: xcode7.1
+
+# Linux dependencies
 addons:
   apt:
     packages:
+    # For build.
     - protobuf-compiler
     - libprotobuf-dev
     - libutempter-dev
-    - tmux			# test suite
-    - perl			# test suite
+    # Test suite needs these.
+    - tmux
+    - perl
 
+# OS X dependencies.  For tag builds, reinstall protobuf with
+# --universal --bottle to get a fat library that will run on any
+# machine.  (This takes about 15 minutes on current Travis
+# infrastructure.)
 before_install:
-  - if test "$TRAVIS_OS_NAME" = osx; then brew update; fi
-  - if test "$TRAVIS_OS_NAME" = osx; then brew install protobuf tmux; fi
-  - if test "$TRAVIS_OS_NAME" = osx; then brew outdated protobuf tmux || brew upgrade protobuf tmux; fi
+  - if test osx = "${TRAVIS_OS_NAME}"; then brew update; fi
+  - if test osx = "${TRAVIS_OS_NAME}"; then brew reinstall protobuf; fi
+  - if test osx = "${TRAVIS_OS_NAME}" && test -n "${TRAVIS_TAG}"; then brew rm protobuf && travis_wait 30 brew install protobuf --universal --bottle; fi
+  - if test osx = "${TRAVIS_OS_NAME}"; then brew reinstall tmux; fi
   - git fetch --tags --unshallow
 
+# 'make distcheck', and OS X package build on tag builds.
 script:
   - ./autogen.sh
   - ./configure --enable-compile-warnings=error --enable-examples
   - make distcheck VERBOSE=1 V=1
+  # Build OS X package for tags.
+  # Unfortunately, the Travis GitHub deployment module cannot do
+  # wildcards, so we must give the package a fixed name before
+  # uploading it.
+  - if test osx = "${TRAVIS_OS_NAME}" && test -n "${TRAVIS_TAG}"; then sh -c "cd macosx && env MACOSX_DEPLOYMENT_TARGET=10.10 ./build.sh && ln ${TRAVIS_TAG}.pkg mosh.pkg && shasum -a 256 mosh.pkg"; fi
+
+# Deploy the OS X package to a GitHub release.
+deploy:
+  provider: releases
+  api_key:
+    secure: O+EmNHUQpqvrWNb1LYv5CXF9o35Mybi+Y48jr+nV3oJ+dLlwgmP71tDzARY0rEY18xT4DL9RBbl5Y74A4nZxvSMSih+VBUf+lgBhkAFkU5W1sRTaJdQVtJw6NcaeuDR/TvVMpJAPxLtHOZnmqplkQVDn4fpkweGaW0Suk7eSlibF3fd0dhoZ8sfDgWQpUW61C08ENBC9/ru01BqDcNuWA9EoS2aLRVCHKR5C02D2EFONlHTxu32X9qm5IcVrk+Zi5mmqyHk74A4a7QRJCDixKyt53LGXYpQh9flePmzSqZDKO5q3PSmWohoUzGLkKBcZit/mSd5aUeIzd7gk/YHNxGfZpGvLzjVDWpjdTXxALTcpVA64VFqLbb3P7N+zYQ7S9ZucwAz8XQ+wArqszQrLtU3vtz+AsO6dLRxAg0lLjNe084Gv0hFAn8u8HGNqBBZ177sTKoEmL3w0wdwSuxhk1aGIFnlKrzjFY57HvJlxSNupAeXqtU9/DNwLyzsnFc1qN4UKJ/hXdb5mtwug+DZy7E0RpJ/jJemfy7RjIAAZCowCLRFBxfRkY3HRaHeaF31mAogkc8FLXFjx2sR95t7GvK1AvJvHdmXs4OxjvgEVl9OI+mWQ9xMqcmjKwx5KuuAcBt8sLK7MJE6iRBwYBQ7eUQrJcYxRMN+w0vhznvLZwv8=
+  # Save build artifacts.
+  skip_cleanup: true
+  file: macosx/${TRAVIS_TAG}.pkg
+  on:
+    repo: cgull/mosh
+    tags: true
+    condition: ${TRAVIS_OS_NAME} = osx
 
 notifications:
   irc:
