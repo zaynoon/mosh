@@ -54,7 +54,7 @@ script:
   - make VERSION
   - cat ./VERSION
   - make distcheck VERBOSE=1 V=1
-  - if test osx = "${TRAVIS_OS_NAME}" && test -n "${TRAVIS_TAG}"; then sh -c "cd macosx && env MACOSX_DEPLOYMENT_TARGET=10.10 ./build.sh && ln mosh-${TRAVIS_TAG}.pkg mosh.pkg && shasum -a 256 mosh.pkg"; fi
+  - if test osx = "${TRAVIS_OS_NAME}" && test -n "${TRAVIS_TAG}"; then sh -c "cd macosx && env MACOSX_DEPLOYMENT_TARGET=10.10 ./build.sh && ln ${TRAVIS_TAG}.pkg mosh.pkg && shasum -a 256 mosh.pkg"; fi
 
 # Deploy the OS X package to a GitHub release.
 deploy:
