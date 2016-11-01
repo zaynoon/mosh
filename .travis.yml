@@ -37,6 +37,7 @@ before_install:
   - |
     if test osx = "${TRAVIS_OS_NAME}"; then
       brew update
+      brew update
       brew reinstall protobuf
       if test -n "${TRAVIS_TAG}"; then
         brew rm protobuf &&
