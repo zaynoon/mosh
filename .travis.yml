@@ -34,10 +34,16 @@ addons:
 # machine.  (This takes about 15 minutes on current Travis
 # infrastructure.)
 before_install:
-  - if test osx = "${TRAVIS_OS_NAME}"; then brew update; fi
-  - if test osx = "${TRAVIS_OS_NAME}"; then brew reinstall protobuf; fi
-  - if test osx = "${TRAVIS_OS_NAME}" && test -n "${TRAVIS_TAG}"; then brew rm protobuf && travis_wait 30 brew install protobuf --universal --bottle; fi
-  - if test osx = "${TRAVIS_OS_NAME}"; then brew reinstall tmux; fi
+  - |
+    if test osx = "${TRAVIS_OS_NAME}"; then
+      brew update
+      brew reinstall protobuf
+      if test -n "${TRAVIS_TAG}"; then
+        brew rm protobuf &&
+        travis_wait 30 brew install protobuf --universal --bottle
+      fi
+      brew reinstall tmux
+    fi
   - git fetch --tags --unshallow
 
 # 'make distcheck', and OS X package build on tag builds.
@@ -49,8 +55,15 @@ script:
   # Unfortunately, the Travis GitHub deployment module cannot do
   # wildcards, so we must give the package a fixed name before
   # uploading it.
-  - if test osx = "${TRAVIS_OS_NAME}" && test -n "${TRAVIS_TAG}"; then sh -c "cd macosx && env MACOSX_DEPLOYMENT_TARGET=10.10 ./build.sh && ln ${TRAVIS_TAG}.pkg mosh.pkg && shasum -a 256 mosh.pkg"; fi
-
+  - |
+    if test osx = "${TRAVIS_OS_NAME}" && test -n "${TRAVIS_TAG}"; then
+      (
+        cd macosx &&
+        env MACOSX_DEPLOYMENT_TARGET=10.10 ./build.sh &&
+        ln ${TRAVIS_TAG}.pkg mosh.pkg &&
+        shasum -a 256 mosh.pkg
+      )
+    fi
 # Deploy the OS X package to a GitHub release.
 deploy:
   provider: releases
