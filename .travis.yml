@@ -43,6 +43,8 @@ before_install:
         travis_wait 30 brew install protobuf --universal --bottle
       fi
       brew reinstall tmux
+      brew --version
+      brew info --json=v1 --installed
     fi
   - git fetch --tags --unshallow
 
