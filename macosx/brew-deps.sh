@@ -58,10 +58,8 @@ package_deps()
 #
 describe()
 {
-    printf "Homebrew version:\n"
-    brew --version
-    printf "Homebrew dump:\n"
-    brew info --json=v1 --installed
+    brew --version > brew-version.txt
+    brew info --json=v1 --installed > brew-info.json
 }
 
 #
