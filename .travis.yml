@@ -91,8 +91,9 @@ deploy:
   # Save build artifacts.
   skip_cleanup: true
   # Using a shell variable in deploy.file is undocumented but seems to work.
-  file: macosx/${TRAVIS_TAG}.pkg
-  file: macosx/build-report.tgz
+  file:
+    - macosx/${TRAVIS_TAG}.pkg
+    - macosx/build-report.tgz
   on:
     repo: cgull/mosh
     tags: true
