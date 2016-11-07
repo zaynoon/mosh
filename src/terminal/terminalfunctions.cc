@@ -62,6 +62,8 @@ static void CSI_EL( Framebuffer *fb, Dispatcher *dispatch )
   case 2: /* all of line */
     fb->reset_row( fb->get_mutable_row( -1 ) );
     break;
+  default:
+    break;
   }
 }
 
@@ -86,6 +88,8 @@ static void CSI_ED( Framebuffer *fb, Dispatcher *dispatch ) {
     for ( int y = 0; y < fb->ds.get_height(); y++ ) {
       fb->reset_row( fb->get_mutable_row( y ) );
     }
+    break;
+  default:
     break;
   }
 }
@@ -112,10 +116,11 @@ static void CSI_cursormove( Framebuffer *fb, Dispatcher *dispatch )
     break;
   case 'H':
   case 'f':
-    int x = dispatch->getparam( 0, 1 );
-    int y = dispatch->getparam( 1, 1 );
-    fb->ds.move_row( x - 1 );
-    fb->ds.move_col( y - 1 );
+    fb->ds.move_row( dispatch->getparam( 0, 1 ) - 1 );
+    fb->ds.move_col( dispatch->getparam( 1, 1 ) - 1 );
+    break;
+  default:
+    break;
   }
 }
 
@@ -259,6 +264,8 @@ static void CSI_TBC( Framebuffer *fb, Dispatcher *dispatch )
       fb->ds.clear_tab( x );
     }
     break;
+  default:
+    break;
   }
 }
 
@@ -293,6 +300,8 @@ static bool *get_DEC_mode( int param, Framebuffer *fb ) {
     return &(fb->ds.mouse_alternate_scroll);
   case 2004: /* bracketed paste */
     return &(fb->ds.bracketed_paste);
+  default:
+    break;
   }
   return NULL;
 }
@@ -338,8 +347,7 @@ static Function func_CSI_DECSM( CSI, "?h", CSI_DECSM, false );
 static Function func_CSI_DECRM( CSI, "?l", CSI_DECRM, false );
 
 static bool *get_ANSI_mode( int param, Framebuffer *fb ) {
-  switch ( param ) {
-  case 4: /* insert/replace mode */
+  if ( param == 4 ) { /* insert/replace mode */
     return &(fb->ds.insert_mode);
   }
   return NULL;
@@ -449,6 +457,8 @@ static void CSI_DSR( Framebuffer *fb, Dispatcher *dispatch )
 	      fb->ds.get_cursor_row() + 1,
 	      fb->ds.get_cursor_col() + 1 );
     dispatch->terminal_to_host.append( cpr );
+    break;
+  default:
     break;
   }
 }
