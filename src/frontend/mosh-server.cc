@@ -337,7 +337,7 @@ int main( int argc, char *argv[] )
 	       "the character set \"%s\",\n\n", native_ctype.str().c_str(), native_charset.c_str() );
       fprintf( stderr, "The client-supplied environment (%s) specifies\n"
 	       "the character set \"%s\".\n\n", client_ctype.str().c_str(), client_charset.c_str() );
-      (void) system( "locale" );
+      int unused __attribute((unused)) = system( "locale" );
       exit( 1 );
     }
   }
