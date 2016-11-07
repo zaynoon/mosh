@@ -242,7 +242,7 @@ int main( int argc, char *argv[] )
 	break;
       }
     }
-  } else if ( argc == 1 ) {
+  // } else if ( argc == 1 ) {
     /* legacy argument parsing for older client wrapper script */
     /* do nothing */
   } else if ( argc == 2 ) {

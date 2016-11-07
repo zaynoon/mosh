@@ -164,10 +164,10 @@ Connection::Socket::Socket( int family )
 #endif
 
   //  int dscp = 0x92; /* OS X does not have IPTOS_DSCP_AF42 constant */
-  int dscp = 0x02; /* ECN-capable transport only */
-  if ( setsockopt( _fd, IPPROTO_IP, IP_TOS, &dscp, sizeof dscp ) < 0 ) {
-    //    perror( "setsockopt( IP_TOS )" );
-  }
+  // int dscp = 0x02; /* ECN-capable transport only */
+  // if ( setsockopt( _fd, IPPROTO_IP, IP_TOS, &dscp, sizeof dscp ) < 0 ) {
+  //   //    perror( "setsockopt( IP_TOS )" );
+  // }
 
   /* request explicit congestion notification on received datagrams */
 #ifdef HAVE_IP_RECVTOS
