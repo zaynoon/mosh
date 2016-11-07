@@ -333,9 +333,11 @@ int main( int argc, char *argv[] )
       string client_charset( locale_charset() );
 
       fprintf( stderr, "mosh-server needs a UTF-8 native locale to run.\n\n" );
-      fprintf( stderr, "Unfortunately, the local environment (%s) specifies\nthe character set \"%s\",\n\n", native_ctype.str().c_str(), native_charset.c_str() );
-      fprintf( stderr, "The client-supplied environment (%s) specifies\nthe character set \"%s\".\n\n", client_ctype.str().c_str(), client_charset.c_str() );
-      int unused __attribute((unused)) = system( "locale" );
+      fprintf( stderr, "Unfortunately, the local environment (%s) specifies\n"
+	       "the character set \"%s\",\n\n", native_ctype.str().c_str(), native_charset.c_str() );
+      fprintf( stderr, "The client-supplied environment (%s) specifies\n"
+	       "the character set \"%s\".\n\n", client_ctype.str().c_str(), client_charset.c_str() );
+      (void) system( "locale" );
       exit( 1 );
     }
   }
@@ -433,12 +435,16 @@ static int run_server( const char *desired_ip, const char *desired_port,
     perror( "fork" );
   } else if ( the_pid > 0 ) {
     fprintf( stderr, "\nmosh-server (%s) [build %s]\n", PACKAGE_STRING, BUILD_VERSION );
-    fprintf( stderr, "Copyright 2012 Keith Winstein <mosh-devel@mit.edu>\n" );
-    fprintf( stderr, "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\n" );
+    fprintf( stderr, "Copyright 2012 Keith Winstein <mosh-devel@mit.edu>\n"
+	     "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\n"
+	     "This is free software: you are free to change and redistribute it.\n"
+	     "There is NO WARRANTY, to the extent permitted by law.\n\n" );
 
     fprintf( stderr, "[mosh-server detached, pid = %d]\n", static_cast<int>(the_pid) );
 #ifndef HAVE_IUTF8
-    fprintf( stderr, "\nWarning: termios IUTF8 flag not defined.\nCharacter-erase of multibyte character sequence\nprobably does not work properly on this platform.\n" );
+    fprintf( stderr, "\nWarning: termios IUTF8 flag not defined.\n"
+	     "Character-erase of multibyte character sequence\n"
+	     "probably does not work properly on this platform.\n" );
 #endif /* HAVE_IUTF8 */
 
     fflush( stdout );
