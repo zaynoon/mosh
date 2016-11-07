@@ -10,6 +10,7 @@ CLANG_SCAN_BUILD = scan-build
 BEAR = bear
 OCLINT_JCD = oclint-json-compilation-database
 OCLINT_OPTIONS = -enable-global-analysis -max-priority-2=1000 -max-priority-3=1000 \
+	-rc LONG_LINE=160 \
 	-rc LONG_VARIABLE_NAME=40 \
 	-rc SHORT_VARIABLE_NAME=1 \
 	-rc MINIMUM_CASES_IN_SWITCH=2
@@ -57,13 +58,13 @@ cov-build: $(BUILT_SOURCES) config.h
 # These two rules are for Bear + OCLint.
 # Don't *run* the tests, prediction-unicode.test generates arguments
 # with illegal UTF-8 that make Bear unhappy.
-compile_commands.json: $(BUILT_SOURCES) config.h
+compile_commands.json: all
 	$(MAKE) clean
 	bear $(MAKE) check TESTS=
 oclint: compile_commands.json
 	$(OCLINT_JCD) -e src/protobufs -- $(OCLINT_OPTIONS)
 
 # Clang's scan-build static checker.
-scan-build: $(BUILT_SOURCES) config.h
+scan-build: all
 	$(MAKE) clean
 	$(CLANG_SCAN_BUILD) $(MAKE) check TESTS=
