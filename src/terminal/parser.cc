@@ -45,10 +45,10 @@ static void append_or_delete( Parser::Action *act,
 {
   assert( act );
 
-  if ( !act->ignore() ) {
-    vec.push_back( act );
-  } else {
+  if ( act->ignore() ) {
     delete act;
+  } else {
+    vec.push_back( act );
   }
 }
 

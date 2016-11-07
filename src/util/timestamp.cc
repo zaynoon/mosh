@@ -61,9 +61,7 @@ void freeze_timestamp( void )
 #if HAVE_CLOCK_GETTIME
   struct timespec tp;
 
-  if ( clock_gettime( CLOCK_MONOTONIC, &tp ) < 0 ) {
-    /* did not succeed */
-  } else {
+  if ( clock_gettime( CLOCK_MONOTONIC, &tp ) == 0 ) {
     uint64_t millis = tp.tv_nsec / 1000000;
     millis += uint64_t( tp.tv_sec ) * 1000;
 
